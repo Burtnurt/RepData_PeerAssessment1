@@ -1,0 +1,110 @@
+--
+title : "Personal Activity Monitoring Anaysis"
+Author: "Nathan Russell"
+--
+## Mean total steps taken per day
+```{r load-data, echo=TRUE}
+library(dplyr)
+library(ggplot2)
+#Load data
+activity_data <- read.csv("activity.csv")
+activity_data$date <- as.Date(activity_data$date, format="%Y-%m-%d")
+str(activity_data)
+# Sum total steps per day
+total_steps_per_day <- activity_data%>%
+  group_by(date) %>%
+  summarize(total_steps = sum(steps, na.rm = TRUE))
+# Display first rows
+head(total_steps_per_day)
+# plot histogram
+ggplot(total_steps_per_day, aes(x = total_steps)) + 
+  geom_histogram(binwidth = 1000, fill = "blue", color = "black") +
+  labs(title = "Histogram of Total steps per day",
+       x = "Total Steps",
+       y = "Frequency")
+#Calculate Mean and median
+mean_steps <- mean(total_steps_per_day$total_steps, na.rm = TRUE)
+median_steps <- median(total_steps_per_day$total_steps, na.rm = TRUE)
+# display results 
+mean_steps
+median_steps
+```
+
+## Average Daily Activity Pattern
+```{r avg-daily-pattern, echo=TRUE}
+# find avg number of steps over 5 mintue interval
+avg_steps_interval <- activity_data %>% 
+  group_by(interval) %>%
+  summarize(mean_steps = mean(steps, na.rm =TRUE)) #compute mean steps
+  
+head(avg_steps_interval)
+
+### Time Series plot 
+ggplot(avg_steps_interval, aes(x = interval, y = mean_steps)) + 
+  geom_line(color = "blue", linewidth = 1) +
+  labs(title = "Average Daily Activity Pattern",
+       x = "5-mintue Interval",
+       y = "Average Steps")
+## Max Interval 
+
+max_interval <- avg_steps_interval %>%
+  filter(mean_steps == max(mean_steps))
+#display max interval
+max_interval
+```
+
+## Handling missing values
+
+```{r count-missing, echo=TRUE}
+missing_values <- sum(is.na(activity_data$steps))
+#display number of missing steps 
+missing_values
+
+# compute mean steps for each 5 min interval (ignore NA)
+interval_means <- activity_data %>%
+  group_by(interval) %>%
+  summarize(mean_steps = mean(steps, na.rm = TRUE))
+
+# Display the first few rows of the interval means
+head(interval_means)
+
+#merge interval means w dataset
+activity_imputed <- activity_data %>%
+  left_join(interval_means, by = "interval")
+#replace NA values in steps columnn with mean for interval
+activity_imputed <- activity_imputed %>%
+  mutate(steps = ifelse(is.na(steps), mean_steps, steps)) %>%
+  select(-mean_steps)
+#count missing values after imputation
+sum(is.na(activity_imputed$steps))
+
+head(activity_imputed)
+```
+
+### Activity pattern differences between weekdays and weekends
+```{r activity-differences, echo = TRUE}
+activity_imputed$date <- as.Date(activity_imputed$date)
+# create factor variable for weekday vs weekend
+activity_imputed <- activity_imputed %>% 
+  mutate(day_type = ifelse(weekdays(date) %in% c("Saturday", "Sunday"), "weekend", "weekday"))
+#convert to factor variable
+activity_imputed$day_type <- factor(activity_imputed$day_type, levels = c("weekday", "weekend"))
+head(activity_imputed)
+#head confirms appropriate classification
+#compute avg number of steps for interval, separated by weekday/weekend
+avg_steps_weekday_weekend <- activity_imputed %>%
+  group_by(interval, day_type) %>%
+  summarize(mean_steps = mean(steps, na.rm = TRUE))
+#display first rows
+head(avg_steps_weekday_weekend)
+
+#create panel plot
+ggplot(avg_steps_weekday_weekend, aes(x = interval, y = mean_steps)) +
+  geom_line(color = "blue") +
+  facet_wrap(~day_type, nrow = 2) +
+  labs(title = "Average Daily Activity Pattern: Weekdays vs. Weekends",
+       x = "5-Minute Interval",
+       y = "Average Number of Steps")
+```
+
+
